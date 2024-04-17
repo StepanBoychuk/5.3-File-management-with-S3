@@ -1,42 +1,39 @@
 const { Router } = require("express");
 const multer = require("multer");
 const logger = require("./../../logger.js");
-const { uploadFile } = require("./../../services/s3.js");
+const {
+  ifObjectExists,
+  uploadFile,
+  getFilesList,
+  getFileUrl,
+  deleteFile,
+  deleteFolder
+} = require("./../../services/s3.js");
+const cleanFilesList = require("./../../services/cleanFilesList.js");
 const checkRequestSize = require("../../middlwares/checkRequestSize.js");
-const ifFileExist = require("./../../middlwares/ifFileExist.js");
-const generateName = require("./../../services/generateUniqueFileName.js");
-const saveFile = require("../../services/saveFile.js");
-const getFilesList = require("./../../services/getFilesList.js");
-const getFile = require("./../../services/getFile.js");
-const deleteFile = require("./../../services/deleteFile.js");
+const checkIfFileExists = require('./../../middlwares/checkIfFileExists.js')
 
 const filesAPI = Router();
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
-filesAPI.get("/api/files", async (req, res) => {
+
+filesAPI.get("/api/filesystem", async (req, res) => {
+  const folder = req.body.folder + '/' || ''
   try {
-    const page = req.query.page || 0;
-    const perPage = req.query.perPage || 5;
-    if (perPage > 100) {
-      res
-        .status(400)
-        .send(
-          "The data you are trying to request in a single request is to large"
-        );
-    }
-    return res.send(await getFilesList(page, perPage));
+    const { Contents } = await getFilesList(folder);
+    res.send(cleanFilesList(Contents));
   } catch (error) {
     logger.error(error);
     res.status(500).send(error.message);
   }
 });
 
-filesAPI.get("/api/files/:id", ifFileExist, async (req, res) => {
+filesAPI.get("/api/filesystem/:filename", checkIfFileExists, async (req, res) => {
+  const folder = req.body.folder + '/' || ''
   try {
-    const file = await getFile(req.params.id);
-    res.send(file);
+    res.send(await getFileUrl(req.params.filename, folder))
   } catch (error) {
     logger.error(error);
     res.status(500).send(error.message);
@@ -44,17 +41,25 @@ filesAPI.get("/api/files/:id", ifFileExist, async (req, res) => {
 });
 
 filesAPI.post(
-  "/api/files",
+  "/api/filesystem",
   checkRequestSize,
   upload.single(),
   async (req, res) => {
+    const folder = req.body.folder + '/' || ''
     try {
       if (!req.file) {
         return res.status(400).send("No file uploaded");
       }
-      const fileName = generateName();
-      await uploadFile(req.file.buffer, fileName, req.file.mimetype);
-      await saveFile(fileName);
+      const isExist = await ifObjectExists(req.file.originalname, folder);
+      if (isExist) {
+        return res.status(409).send("File with this name is already exist");
+      }
+      await uploadFile(
+        req.file.buffer,
+        req.file.originalname,
+        req.file.mimetype,
+        folder
+      );
       res.status(201).send();
     } catch (error) {
       logger.error(error);
@@ -63,14 +68,31 @@ filesAPI.post(
   }
 );
 
-filesAPI.delete("/api/files/:id", ifFileExist, async (req, res) => {
+filesAPI.delete("/api/filesystem/:filename", checkIfFileExists, async (req, res) => {
+  const folder = req.body.folder + '/' || ''
   try {
-    deleteFile(req.params.id);
+    await deleteFile(req.params.filename, folder);
     res.status(204).send();
   } catch (error) {
     logger.error(error);
     res.status(500).send(error.message);
   }
 });
+
+filesAPI.delete("/api/filesystem", async (req, res) => {
+  try {
+    if (!req.body.folder) {
+      return res.status(400).send(`Please, add key 'folder' with value of folder name to request body`)
+    }
+    if (ifObjectExists('', req.body.folder)) {
+      return res.status(404).send('There is no folder with this name')
+    }
+    deleteFolder(req.body.folder)
+    res.status(204).send()
+  }catch(error){
+    logger.error(error)
+    res.status(500).send(error.message)
+  }
+})
 
 module.exports = filesAPI;
