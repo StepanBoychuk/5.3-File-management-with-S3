@@ -4,20 +4,16 @@ On
 
 >GET api/filesystem
 
-will return list of files and folders. You can choose fodler by adding 'folder' key and folder name value to request body.
+will return list of files and folders.
 
->GET api/filesystem/:filename
+>GET api/filesystem/:filepath
 
-will return URL of filename. If the file you want to get is located in the folder, you need to set folder name or path to folder in request body by adding 'folder' key and folder name/path as a value.
+will return URL of file. To get URL of a file, which is located in folder, describe path to that file in URL. (f.e. path/to/file.txt)
 
->POST /api/filesystem
+>POST /api/filesystem/:filepath
 
-will upload file to S3Bucket. Maximum file size is 10 MB. You can save file into a folder by setting folder name/path in request body by adding 'folder' key and folder name/path as a value. It will create new folder if there already no folder with such name.
+will upload file to S3Bucket. Maximum file size is 10 MB. You can save file into a folder by descibing path to the folder in 'filepath'. If there are no such folder/folders, it will create new one. If 'filepath' is empty, file will be saved outside of folder.
 
->DEl /api/filesystem/:filename
+>DEl /api/filesystem/:filepath
 
-will delete file with this name in S3Bucket. If file, which you want to delete is located in folder, add folder name/path in request body with key 'folder' and folder name/path as value.
-
->DEL /api/filesystem
-
-will delete folder and all files in it. require folder name/path in request body with 'folder' as key and folder name/path as value
+will delete file or entire folder described in 'filepath'

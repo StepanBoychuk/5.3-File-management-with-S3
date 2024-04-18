@@ -17,10 +17,10 @@ const s3 = new S3Client({
   region: process.env.BUCKET_REGION,
 });
 
-const ifObjectExists = async (fileName, folderName) => {
+const ifObjectExists = async (filePath) => {
   const params = {
     Bucket: process.env.BUCKET_NAME,
-    Key: folderName + fileName,
+    Key: filePath,
   };
   try {
     await s3.send(new HeadObjectCommand(params));
@@ -33,47 +33,37 @@ const ifObjectExists = async (fileName, folderName) => {
   }
 };
 
-const getFilesList = async (folderName) => {
+const getFilesList = async () => {
   const params = {
     Bucket: process.env.BUCKET_NAME,
-    Prefix: folderName,
   };
   return s3.send(new ListObjectsV2Command(params));
 };
 
-const uploadFile = async (fileBuffer, fileName, mimetype, folderName) => {
+const uploadFile = async (fileBuffer, filePath, mimetype) => {
   const uploadParams = {
     Bucket: process.env.BUCKET_NAME,
     Body: fileBuffer,
-    Key: folderName + fileName,
+    Key: filePath,
     ContentType: mimetype,
   };
 
   return s3.send(new PutObjectCommand(uploadParams));
 };
 
-const getFileUrl = async (fileName, folderName) => {
+const getFileUrl = async (filePath) => {
   const command = new GetObjectCommand({
     Bucket: process.env.BUCKET_NAME,
-    Key: folderName + fileName,
+    Key: filePath,
   });
   return await getSignedUrl(s3, command);
 };
 
-const deleteFile = (fileName, folderName) => {
-  return s3.send(
-    new DeleteObjectCommand({
-      Bucket: process.env.BUCKET_NAME,
-      Key: folderName + fileName,
-    })
-  );
-};
-
-const deleteFolder = async (folderName) => {
+const deleteObject = async (objectPath) => {
   const deletePromises = [];
   const listParams = {
     Bucket: process.env.BUCKET_NAME,
-    Prefix: folderName,
+    Prefix: objectPath,
   };
   const { Contents } = await s3.send(new ListObjectsV2Command(listParams));
   Contents.forEach(({ Key }) => {
@@ -94,6 +84,5 @@ module.exports = {
   uploadFile,
   ifObjectExists,
   getFileUrl,
-  deleteFile,
-  deleteFolder,
+  deleteObject,
 };
